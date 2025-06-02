@@ -3,7 +3,7 @@ from pathlib import Path
 
 import librosa
 import torch
-import perth
+
 import torch.nn.functional as F
 from huggingface_hub import hf_hub_download
 from safetensors.torch import load_file
@@ -123,7 +123,7 @@ class ChatterboxTTS:
         self.tokenizer = tokenizer
         self.device = device
         self.conds = conds
-        self.watermarker = perth.PerthImplicitWatermarker()
+
 
     @classmethod
     def from_local(cls, ckpt_dir, device) -> 'ChatterboxTTS':
@@ -136,13 +136,17 @@ class ChatterboxTTS:
             map_location = None
 
         ve = VoiceEncoder()
+
         ve.load_state_dict(
-            load_file(ckpt_dir / "ve.safetensors")
-        )
+            torch.load(ckpt_dir / "ve.pt", map_location=map_location)
+        )        
         ve.to(device).eval()
 
         t3 = T3()
-        t3_state = load_file(ckpt_dir / "t3_cfg.safetensors")
+        if False:
+            t3_state = load_file(ckpt_dir / "t3_cfg.pt")
+        else:
+            t3_state = torch.load(ckpt_dir / "t3_cfg.pt", map_location=map_location)
         if "model" in t3_state.keys():
             t3_state = t3_state["model"][0]
         t3.load_state_dict(t3_state)
@@ -150,8 +154,8 @@ class ChatterboxTTS:
 
         s3gen = S3Gen()
         s3gen.load_state_dict(
-            load_file(ckpt_dir / "s3gen.safetensors"), strict=False
-        )
+            torch.load(ckpt_dir / "s3gen.pt", map_location=map_location), strict=False
+        )        
         s3gen.to(device).eval()
 
         tokenizer = EnTokenizer(
@@ -259,5 +263,5 @@ class ChatterboxTTS:
                 ref_dict=self.conds.gen,
             )
             wav = wav.squeeze(0).detach().cpu().numpy()
-            watermarked_wav = self.watermarker.apply_watermark(wav, sample_rate=self.sr)
-        return torch.from_numpy(watermarked_wav).unsqueeze(0)
+
+        return torch.from_numpy(wav).unsqueeze(0)
