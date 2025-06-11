@@ -78,6 +78,21 @@ class Conditionals:
         - prompt_feat_len
         - embedding
     """
+    """
+    T3 Conditions (t3_cond):
+
+        speaker_emb: Voice encoder embedding
+        cond_prompt_speech_tokens: Speech tokens for conditioning
+        emotion_adv: Emotion exaggeration level
+
+    S3Gen Conditions (s3gen_ref_dict):
+
+        prompt_token: Reference speech tokens
+        prompt_token_len: Token sequence length
+        prompt_feat: Reference mel spectrograms
+        prompt_feat_len: Mel feature length
+        embedding: Speaker x-vector embedding
+    """
     t3: T3Cond
     gen: dict
 
