@@ -1,2 +1,3 @@
+# file: tts/chatterbox/models/s3gen/__init__.py
 from .s3gen import S3Token2Wav as S3Gen
 from .const import S3GEN_SR

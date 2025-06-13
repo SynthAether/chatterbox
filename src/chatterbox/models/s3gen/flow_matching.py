@@ -1,3 +1,4 @@
+# file: tts/chatterbox/models/s3gen/flow_matching.py
 # Copyright (c) 2024 Alibaba Inc (authors: Xiang Lyu, Zhihao Du)
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,17 +16,7 @@ import threading
 import torch
 import torch.nn.functional as F
 from .matcha.flow_matching import BASECFM
-from omegaconf import OmegaConf
-
-
-CFM_PARAMS = OmegaConf.create({
-    "sigma_min": 1e-06,
-    "solver": "euler",
-    "t_scheduler": "cosine",
-    "training_cfg_rate": 0.2,
-    "inference_cfg_rate": 0.7,
-    "reg_loss_type": "l1"
-})
+from .configs import CFM_PARAMS
 
 
 class ConditionalCFM(BASECFM):

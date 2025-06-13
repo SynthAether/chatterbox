@@ -1,4 +1,5 @@
-# jrm: adapted from CosyVoice/cosyvoice/hifigan/generator.py
+# file: tts/chatterbox/models/s3gen/hifigan.py
+# Adapted from CosyVoice/cosyvoice/hifigan/generator.py
 #      most modules should be reusable, but I found their SineGen changed a git.
 
 # Copyright (c) 2024 Alibaba Inc (authors: Xiang Lyu, Kai Hu)

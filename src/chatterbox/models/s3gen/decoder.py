@@ -1,3 +1,4 @@
+# file: tts/chatterbox/models/s3gen/decoder.py
 # Copyright (c) 2024 Alibaba Inc (authors: Xiang Lyu, Zhihao Du)
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
