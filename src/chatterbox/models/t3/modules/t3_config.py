@@ -1,3 +1,5 @@
+# file: tts/chatterbox/models/t3/modules/t3_config.py
+
 from ..llama_configs import LLAMA_CONFIGS
 
 
