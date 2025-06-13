@@ -1,3 +1,4 @@
+# file: tts/chatterbox/models/t3/inference/alignment_stream_analyzer.py
 # Copyright (c) 2025 Resemble AI
 # Author: John Meade, Jeremy Hsu
 # MIT License
