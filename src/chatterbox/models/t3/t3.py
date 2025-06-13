@@ -1,3 +1,4 @@
+# file: tts/chatterbox/models/t3/t3.py
 # Copyright (c) 2025 Resemble AI
 # MIT License
 import logging
@@ -17,15 +18,9 @@ from .modules.t3_config import T3Config
 from .llama_configs import LLAMA_CONFIGS
 from .inference.t3_hf_backend import T3HuggingfaceBackend
 from .inference.alignment_stream_analyzer import AlignmentStreamAnalyzer
-
+from ..utils import AttrDict
 
 logger = logging.getLogger(__name__)
-
-
-class AttrDict(dict):
-    def __init__(self, *args, **kwargs):
-        super(AttrDict, self).__init__(*args, **kwargs)
-        self.__dict__ = self
 
 
 def _ensure_BOT_EOT(text_tokens: Tensor, hp):
@@ -69,6 +64,7 @@ class T3(nn.Module):
         self.text_head = nn.Linear(self.cfg.hidden_size, hp.text_tokens_dict_size, bias=False)
         self.speech_head = nn.Linear(self.cfg.hidden_size, hp.speech_tokens_dict_size, bias=False)
         self.compiled = False
+        #self.inference = False
 
     @property
     def device(self):
@@ -170,7 +166,69 @@ class T3(nn.Module):
             hidden_states=hidden_states,
         )
 
+
+
     def loss(
+        self,
+        *,
+        t3_cond: T3Cond,
+        text_tokens: torch.LongTensor,        # (B, S_text_padded), includes BOS & EOS
+        text_token_lens: torch.LongTensor,    # (B,), actual lengths including BOS & EOS
+        speech_tokens: torch.LongTensor,      # (B, S_speech_padded), includes BOS & EOS
+        speech_token_lens: torch.LongTensor,  # (B,), actual lengths including BOS & EOS
+        labels_text: torch.LongTensor,        # (B, S_text_padded-1), already masked with –100
+        labels_speech: torch.LongTensor       # (B, S_speech_padded-1), already masked with –100
+    ):
+        """
+        Compute text and speech cross-entropy using pre-masked labels from the collator.
+        Assumes:
+        - labels_text[t] corresponds to predicting text_tokens[:, 1:] with –100 where ignored
+        - labels_speech[t] corresponds to predicting speech_tokens[:, 1:] with –100 where ignored
+        """
+
+        # 1) Run model to get logits
+        out = self.forward(
+            t3_cond=t3_cond,
+            text_tokens=text_tokens,
+            text_token_lens=text_token_lens,
+            speech_tokens=speech_tokens,
+            speech_token_lens=speech_token_lens,
+            training=True,
+        )
+        # out.text_logits: (B, S_text_padded, V_text)
+        # out.speech_logits: (B, S_speech_padded, V_speech)
+        device = out.text_logits.device
+        IGNORE_ID = -100
+
+        # --- Text Loss (use labels_text directly) ---
+        # Align logits: predict t₁..EOS from inputs [BOS, t₁..]
+        logits_for_text = out.text_logits[:, :-1, :].contiguous()  # (B, S_text_padded-1, V_text)
+        # labels_text already has shape (B, S_text_padded-1) with –100 where masked
+        if logits_for_text.size(1) == 0:
+            loss_text = torch.tensor(0.0, device=device, requires_grad=self.training)
+        else:
+            loss_text = F.cross_entropy(
+                logits_for_text.transpose(1, 2),  # (B, V_text, S_text_padded-1)
+                labels_text,                      # (B, S_text_padded-1), ignore_index=–100
+                ignore_index=IGNORE_ID
+            )
+
+        # --- Speech Loss (use labels_speech directly) ---
+        logits_for_speech = out.speech_logits[:, :-1, :].contiguous()  # (B, S_speech_padded-1, V_speech)
+        # labels_speech already has shape (B, S_speech_padded-1) with –100 where masked
+        if logits_for_speech.size(1) == 0:
+            loss_speech = torch.tensor(0.0, device=device, requires_grad=self.training)
+        else:
+            loss_speech = F.cross_entropy(
+                logits_for_speech.transpose(1, 2),  # (B, V_speech, S_speech_padded-1)
+                labels_speech,                      # (B, S_speech_padded-1), ignore_index=–100
+                ignore_index=IGNORE_ID
+            )
+
+        return loss_text, loss_speech, out.speech_logits
+
+
+    def loss_old(
         self,
         *,
         t3_cond: T3Cond,
@@ -201,8 +259,11 @@ class T3(nn.Module):
         mask_speech = torch.arange(len_speech, device=device)[None] >= speech_token_lens[:, None]  # (B, len_speech)
         masked_text = text_tokens.masked_fill(mask_text, IGNORE_ID)
         masked_speech = speech_tokens.masked_fill(mask_speech, IGNORE_ID)
-        loss_text = F.cross_entropy(out.text_logits, masked_text, ignore_index=IGNORE_ID)
-        loss_speech = F.cross_entropy(out.speech_logits, masked_speech, ignore_index=IGNORE_ID)
+
+        loss_text   = F.cross_entropy(out.text_logits.transpose(1, 2),    masked_text,    ignore_index=IGNORE_ID)
+        loss_speech = F.cross_entropy(out.speech_logits.transpose(1, 2), masked_speech, ignore_index=IGNORE_ID)
+        #loss_text = F.cross_entropy(out.text_logits, masked_text, ignore_index=IGNORE_ID)
+        #loss_speech = F.cross_entropy(out.speech_logits, masked_speech, ignore_index=IGNORE_ID)
 
         return loss_text, loss_speech
 
@@ -253,23 +314,27 @@ class T3(nn.Module):
         # Note the llama-specific logic. Other tfmr types can be added later.
 
         self.compiled = False
+        #self.inference = True
 
         # TODO? synchronize the expensive compile function
         # with self.compile_lock:
         if not self.compiled:
-            alignment_stream_analyzer = AlignmentStreamAnalyzer(
-                self.tfmr,
-                None,
-                text_tokens_slice=(len_cond, len_cond + text_tokens.size(-1)),
-                alignment_layer_idx=9, # TODO: hparam or something?
-                eos_idx=self.hp.stop_speech_token,
-            )
+            if False: # self.inference:
+                alignment_stream_analyzer = None
+            else:
+                alignment_stream_analyzer = AlignmentStreamAnalyzer(
+                    self.tfmr,
+                    None,
+                    text_tokens_slice=(len_cond, len_cond + text_tokens.size(-1)),
+                    alignment_layer_idx=9, # TODO: hparam or something?
+                    eos_idx=self.hp.stop_speech_token,
+                )
             patched_model = T3HuggingfaceBackend(
                 config=self.cfg,
                 llama=self.tfmr,
                 speech_enc=self.speech_emb,
                 speech_head=self.speech_head,
-                alignment_stream_analyzer=alignment_stream_analyzer,
+                alignment_stream_analyzer=alignment_stream_analyzer, # None during inference
             )
             self.patched_model = patched_model
             self.compiled = True

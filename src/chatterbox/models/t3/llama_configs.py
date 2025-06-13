@@ -1,3 +1,5 @@
+# file: tts/chatterbox/models/t3/llama_configs.py
+
 LLAMA_520M_CONFIG_DICT = dict(
     # Arbitrary small number that won't cause problems when loading.
     # These param are unused due to custom input layers.
@@ -8,7 +10,7 @@ LLAMA_520M_CONFIG_DICT = dict(
     intermediate_size=4096,
     num_hidden_layers=30,
     num_attention_heads=16,
-    attn_implementation="sdpa",
+    attn_implementation="sdpa", #"eager", # "sdpa",
     head_dim=64,
     tie_word_embeddings=False,
     hidden_act="silu",
