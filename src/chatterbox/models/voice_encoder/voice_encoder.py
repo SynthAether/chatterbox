@@ -1,3 +1,5 @@
+# file: tts/chatterbox/models/voice_encoder/voice_encoder.py
+
 # Adapted from https://github.com/CorentinJ/Real-Time-Voice-Cloning
 # MIT License
 from typing import List, Union, Optional

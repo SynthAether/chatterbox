@@ -1,3 +1,5 @@
+# file: tts/chatterbox/models/voice_encoder/config.py
+
 class VoiceEncConfig:
     num_mels = 40
     sample_rate = 16000
