@@ -1,3 +1,5 @@
+# file: tts/chatterbox/models/s3gen/transformer/positionwise_feed_forward.py
+
 # Copyright (c) 2019 Shigeki Karita
 #               2020 Mobvoi Inc (Binbin Zhang)
 #
