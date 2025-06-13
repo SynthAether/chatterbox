@@ -1,3 +1,4 @@
+# file: tts/chatterbox/models/s3gen/utils/mel.py
 """mel-spectrogram extraction in Matcha-TTS"""
 from librosa.filters import mel as librosa_mel_fn
 import torch
